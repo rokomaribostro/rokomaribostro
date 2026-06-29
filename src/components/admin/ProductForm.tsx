@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Upload, ImageIcon, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface ProductFormProps {
   product?: Record<string, any> | null;
@@ -16,6 +17,11 @@ const CATEGORIES = [
 ];
 
 const BADGE_OPTIONS = ['Sale', 'New', 'Trending', 'Premium', 'Bridal', 'Eid Special'];
+
+function getPublicUrl(path: string) {
+  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+  return data.publicUrl;
+}
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
   const [form, setForm] = useState<Record<string, any>>({
@@ -35,6 +41,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     sort_order: 0,
   });
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (product) {
@@ -54,19 +63,70 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     setForm(prev => ({ ...prev, [key]: val }));
   };
 
+  const uploadFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files (JPG, PNG, WebP, GIF) are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be under 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: upError } = await supabase.storage
+      .from('product-images')
+      .upload(path, file, { cacheControl: '3600', upsert: false });
+
+    if (upError) {
+      setError('Upload failed: ' + upError.message);
+      setUploading(false);
+      return;
+    }
+
+    const publicUrl = getPublicUrl(path);
+    handleChange('image_url', publicUrl);
+    setUploading(false);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => setDragOver(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.name.trim() || !form.name_bn.trim() || !form.price || !form.image_url.trim()) {
-      setError('Please fill in Name, Bangla Name, Price, and Image URL.');
+      setError('Please fill in Name, Bangla Name, Price, and upload an Image.');
       return;
     }
 
     const sizesArr = form.sizes
-      ? String(form.sizes).split(',').map(s => s.trim()).filter(Boolean)
+      ? String(form.sizes).split(',').map((s: string) => s.trim()).filter(Boolean)
       : [];
     const colorsArr = form.colors
-      ? String(form.colors).split(',').map(s => s.trim()).filter(Boolean)
+      ? String(form.colors).split(',').map((s: string) => s.trim()).filter(Boolean)
       : [];
 
     const payload: Record<string, any> = {
@@ -149,24 +209,55 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             </div>
           </div>
 
-          {/* Image URL */}
+          {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-brown-800 mb-1.5">Product Image URL</label>
-            <input
-              type="text" value={form.image_url} onChange={e => handleChange('image_url', e.target.value)}
-              placeholder="https://yourimagehost.com/photo.jpg"
-              className="w-full px-4 py-2.5 rounded-xl border border-brown-200 bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-400 text-brown-900 text-sm"
-              required
-            />
-            <p className="text-xs text-brown-400 mt-1">Paste a URL. You can upload photos to a free image host (like Imgur, Google Drive, or Dropbox) and copy the link.</p>
-          </div>
+            <label className="block text-sm font-medium text-brown-800 mb-1.5">Product Image</label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`relative w-full rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all ${
+                dragOver
+                  ? 'border-brown-500 bg-brown-50'
+                  : form.image_url
+                    ? 'border-green-300 bg-green-50/30'
+                    : 'border-brown-200 bg-cream-50 hover:border-brown-400 hover:bg-brown-50/50'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
 
-          {/* Image preview */}
-          {form.image_url && (
-            <div className="w-full h-32 rounded-xl overflow-hidden border border-brown-200">
-              <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
+              {uploading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 size={28} className="animate-spin text-brown-500" />
+                  <p className="text-sm text-brown-600">Uploading image...</p>
+                </div>
+              ) : form.image_url ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-full h-40 rounded-xl overflow-hidden border border-brown-200">
+                    <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center gap-2 text-green-600">
+                    <ImageIcon size={16} />
+                    <span className="text-sm font-medium">Image uploaded</span>
+                  </div>
+                  <p className="text-xs text-brown-400">Click or drag to replace</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Upload size={28} className="text-brown-400" />
+                  <p className="text-sm text-brown-600 font-medium">Click or drag image here</p>
+                  <p className="text-xs text-brown-400">JPG, PNG, WebP, GIF up to 5MB</p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Category & Sort Order */}
           <div className="grid grid-cols-2 gap-4">
@@ -266,7 +357,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
           <div className="flex gap-3 pt-2">
             <button
-              type="submit" disabled={isSaving}
+              type="submit" disabled={isSaving || uploading}
               className="flex-1 btn-primary py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
               style={{ fontFamily: 'Hind Siliguri, sans-serif' }}
             >

@@ -11,9 +11,10 @@ interface ProductGridProps {
   activeCategory: Category;
   onAddToCart: (product: Product) => void;
   onOrderNow: (product: Product) => void;
+  onImageClick: (product: Product) => void;
 }
 
-export function ProductGrid({ products, loading, error, activeCategory, onAddToCart, onOrderNow }: ProductGridProps) {
+export function ProductGrid({ products, loading, error, activeCategory, onAddToCart, onOrderNow, onImageClick }: ProductGridProps) {
   const { t } = useLanguage();
 
   const filtered =
@@ -59,6 +60,7 @@ export function ProductGrid({ products, loading, error, activeCategory, onAddToC
                   product={product}
                   onAddToCart={onAddToCart}
                   onOrderNow={onOrderNow}
+                  onImageClick={onImageClick}
                 />
               ))}
             </div>

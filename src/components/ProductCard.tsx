@@ -6,9 +6,10 @@ interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product) => void;
   onOrderNow: (product: Product) => void;
+  onImageClick: (product: Product) => void;
 }
 
-export function ProductCard({ product, onAddToCart, onOrderNow }: ProductCardProps) {
+export function ProductCard({ product, onAddToCart, onOrderNow, onImageClick }: ProductCardProps) {
   const { lang, t } = useLanguage();
 
   const discount = product.originalPrice
@@ -24,7 +25,10 @@ export function ProductCard({ product, onAddToCart, onOrderNow }: ProductCardPro
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-brown-100">
       {/* Image */}
-      <div className="relative overflow-hidden aspect-[3/4]">
+      <div
+        className="relative overflow-hidden aspect-[3/4] cursor-zoom-in"
+        onClick={() => onImageClick(product)}
+      >
         <img
           src={product.image}
           alt={name}

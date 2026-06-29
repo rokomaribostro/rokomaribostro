@@ -5,6 +5,7 @@ import { CategorySection } from './components/CategorySection';
 import { ProductGrid } from './components/ProductGrid';
 import { CartSidebar } from './components/CartSidebar';
 import { OrderModal } from './components/OrderModal';
+import { ImageLightbox } from './components/ImageLightbox';
 import { Footer } from './components/Footer';
 import { AdminPage } from './components/admin/AdminPage';
 import { CartItem, Category, Product } from './types';
@@ -18,6 +19,7 @@ function Storefront() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
+  const [lightboxProduct, setLightboxProduct] = useState<Product | null>(null);
 
   const handleAddToCart = (product: Product) => {
     setCartItems(prev => {
@@ -66,6 +68,7 @@ function Storefront() {
           activeCategory={activeCategory}
           onAddToCart={handleAddToCart}
           onOrderNow={handleOrderNow}
+          onImageClick={(product) => setLightboxProduct(product)}
         />
       </main>
 
@@ -88,6 +91,13 @@ function Storefront() {
         selectedProduct={selectedProduct}
         onClose={() => { setOrderOpen(false); setSelectedProduct(null); }}
         onSuccess={handleOrderSuccess}
+      />
+
+      <ImageLightbox
+        product={lightboxProduct}
+        products={products}
+        onClose={() => setLightboxProduct(null)}
+        onNavigate={(product) => setLightboxProduct(product)}
       />
     </div>
   );
